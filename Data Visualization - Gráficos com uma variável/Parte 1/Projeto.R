@@ -50,7 +50,7 @@ rating.Histogram <- ggplot(data = dados) + geom_histogram(mapping = aes(x = Rati
                                                           breaks = seq(1,5)) + xlim(c(1,5))
 rating.Histogram
 
-# Quais as categorias de aplicativos que estão mais em maior quantidade e 
+# Quais as categorias de aplicativos que estão em maior quantidade e 
 # menor quantidade na loja?
 ggplot(data = dados) + geom_bar(mapping = aes(x = Category), stat = 'count')
 #stat: a própria função irá fazer a contagem de cada categoria, semelhante 
@@ -149,4 +149,65 @@ type.Freq.Plot <- ggplot(type.Freq) + geom_bar(aes(x = '', y = Freq, fill = Var1
                              stat = 'identity',
                              width = 1) +
                     coord_polar(theta = 'y', start = 0) #altera o formato da barra
+
+
+# O que podemos concluir sobre o tamanho de download e instalação dos aplicativos?
+str(dados2)
+# Olhando o tipo de dado na coluna Size, podemos ver que é do tipo chr, ou seja,
+# não é numérica. Teoricamente, deveria ser numérica, porque deveria armazenar
+# apenas o tamanho do aplicativo, porém, possui letras junto com números nos seus valores.
+# Conseguimos ver, pelos exemplos iniciais que a str() dá, que há valores armazenando
+# M nos registros (megabytes). Porém, há outros tipos de valores que devem ser
+# tratados nessa coluna?
+# Fazendo uma tabela de frequência para verificar isso
+freq.Size <- data.frame(table(dados2$Size))
+freq.Size
+# Ao explorar essa tabela de frequência, foi possível identificar que os tamanhos
+# dos aplicativos são indicados como kilobytes, pela letra k, ou megabytes, pela 
+# letra M. Além disso, temos valores como Varies with device, que nos indica que
+# o tamanho depende do dispositivo.
+
+# Transformando esses valores, convertendo-os para a mesma escala (aqui, kilobytes)
+# Verificando a ocorrência de K ou M nos registros
+# Se tiver K no registro, apenas elimina a letra; se tiver M no registro, faz a conversão
+# de megabyte para kilobyte (1K = 1024M)
+
+# Exemplo com 1 string de teste
+teste <- dados2$Size[1]
+grepl(pattern = 'M', x = teste, ignore.case = T) # Ocorrencia de M em teste?
+grepl(pattern = 'K', x = teste, ignore.case = T) # Ocorrencia de K em teste?
+gsub(pattern = 'M', replacement = '--', x = teste, ignore.case = T) # Substituicao de M por --
+gsub(pattern = 'K', replacement = '--', x = teste, ignore.case = T) # Substituicao de K por --
+
+# Aplicando para a coluna inteira
+dados2$kb <- sapply(X = dados2$Size, FUN = function(y){
+  if (grepl('M', y, ignore.case = T)){
+    y <- as.numeric(gsub(pattern = 'M', replacement = '', x = y, ignore.case = T))*1024
+  }else if (grepl('K|\\+', y, ignore.case = T)){
+    y <- as.numeric(gsub(pattern = 'K|\\+', replacement = '', x = y, ignore.case = T))
+  }else{
+    y <- 'nd'
+  }
+})
+
+hist(as.numeric(dados2$kb))
+# Resolvendo o problema do eixo x para que não fique mais em notação científica
+options(scipen = 999)
+# Gerando o histograma mais uma vez
+hist(as.numeric(dados2$kb))
+
+# Removendo os registros nd e convertendo a coluna para o tipo numérico, colocando 
+# em um novo conjunto de dados essas mudanças (importante manter os dados originais,
+# dessa forma, criar um novo conjunto de dados com mudanças, faz sentido)
+size.app <- dados2 %>% filter(kb != 'nd') %>% mutate(kb = as.numeric(kb))
+# Gerando um gráfico desse novo conjunto de dados
+size.App.Plot <- ggplot(size.app) + geom_histogram(aes(kb))
+size.App.Plot
+
+
+
+
+
+
+
 
