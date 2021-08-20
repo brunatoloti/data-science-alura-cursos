@@ -48,6 +48,9 @@ hist(dados$Rating, xlim = c(1,5))
 rating.Histogram <- ggplot(data = dados) + geom_histogram(mapping = aes(x = Rating), 
                                                           na.rm = TRUE,
                                                           breaks = seq(1,5)) + xlim(c(1,5))
+rating.Histogram <- rating.Histogram + ggtitle("Histograma das Notas") + 
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) 
 rating.Histogram
 
 # Quais as categorias de aplicativos que estão em maior quantidade e 
@@ -78,7 +81,11 @@ category.Top10 <- category.Freq[(order(-category.Freq$Freq)),]
 category.Top10 <- category.Top10[1:10, ]
 freq.Category.Plot <- ggplot(data = category.Top10) + geom_bar(mapping = aes(x = reorder(Var1, Freq), y = Freq), 
                                         stat = 'identity') + coord_flip()
-
+freq.Category.Plot <- freq.Category.Plot + ggtitle('As 10 categorias com mais apps') +
+  xlab('Categoria') + ylab('Quantidade') + 
+  geom_bar(aes(Var1, Freq), fill = 'darkcyan', stat = 'identity') + 
+  theme_bw()
+freq.Category.Plot
 
 # Fazendo correção de dados.
 # Quando geramos o gráfico com a frequência das categorias na loja, conseguimos
@@ -137,8 +144,13 @@ dados2 <- dados2 %>%
                                          'regular')))  #mutate cria uma nova coluna no conjunto
 
 # Gerando um gráfico com essas novas informações, com esses rótulos
-RatingClass.Plot <- ggplot(dados2) + geom_bar(aes(Ratingclass), stat = 'count')
-
+RatingClass.Plot <- ggplot(dados2) + geom_bar(aes(Ratingclass), stat = 'count') +
+  ggtitle('Quantidade de notas por classe') + 
+  xlab('Classe') +
+  ylab('Quantidade') +
+  geom_bar(aes(Ratingclass), fill = c('green4', 'yellow2', 'red')) +
+  theme_bw()
+RatingClass.Plot
 
 # Gerando um gráfico de pizza para visualizarmos a proporção do tipo de aplicativo,
 # ou seja, a proporção de apps pagos e não pagos
@@ -146,10 +158,29 @@ RatingClass.Plot <- ggplot(dados2) + geom_bar(aes(Ratingclass), stat = 'count')
 type.Freq <- data.frame(table(dados2$Type))
 
 type.Freq.Plot <- ggplot(type.Freq) + geom_bar(aes(x = '', y = Freq, fill = Var1), 
-                             stat = 'identity',
-                             width = 1) +
+                                               stat = 'identity',
+                                               width = 1) +
                     coord_polar(theta = 'y', start = 0) #altera o formato da barra
-
+#Melhorando esse gráfico
+blank_theme <- theme_minimal() +
+               theme(
+                 axis.title.x = element_blank(),
+                 axis.title.y = element_blank(),
+                 panel.border = element_blank(),
+                 panel.grid = element_blank(),
+                 axis.ticks = element_blank(),
+                 axis.text.x = element_blank()
+               )
+type.Freq.Plot <- type.Freq.Plot + blank_theme
+# Importando a biblioteca scales
+library(scales)
+type.Freq.Plot <- type.Freq.Plot + geom_text(aes(x = '', y = Freq/2,
+                                                 label = percent(Freq/sum(Freq))), size = 3) +
+                                   scale_fill_discrete(name = 'Tipo App') + #Mudar a legenda
+                                   ggtitle('Proporção dos tipos de App') +
+                                   theme(plot.title = element_text(hjust = 0.5))
+                  
+type.Freq.Plot
 
 # O que podemos concluir sobre o tamanho de download e instalação dos aplicativos?
 str(dados2)
@@ -201,13 +232,67 @@ hist(as.numeric(dados2$kb))
 # dessa forma, criar um novo conjunto de dados com mudanças, faz sentido)
 size.app <- dados2 %>% filter(kb != 'nd') %>% mutate(kb = as.numeric(kb))
 # Gerando um gráfico desse novo conjunto de dados
-size.App.Plot <- ggplot(size.app) + geom_histogram(aes(kb))
+size.App.Plot <- ggplot(size.app) + geom_histogram(aes(kb)) +
+  ggtitle('Histograma do tamanho dos aplicativos') +
+  geom_histogram(aes(kb, fill = ..x..)) +
+  scale_fill_gradient(low='blue', high = 'yellow') + 
+  guides(fill = FALSE) +
+  xlab('Tamanho do App (em kb)') + 
+  ylab('Quantidade de Apps') +
+  theme_bw()
 size.App.Plot
 
 
+# Fazendo análises em outra base de dados
+# Base fornecida pelo curso
+# Com essa base de dados, o intuito é elaborar um gráfico para apresentar 
+# informações sobre a nota de avaliação através do tempo
+# Importando a base de dados
+notas <- read.csv('C:/Users/Admin/Documents/Data Visualization - Gráficos com uma variável/Parte 1/user_reviews.csv')
 
+# Explorando a base de dados
+str(notas)
 
+# Para trabalhar com data e hora, usaremos o pacote lubridate
+# Instalando o pacote
+install.packages("lubridate")
+library(lubridate)
 
+# Pelo str(notas) feito, conseguimos ver que a coluna data é do tipo chr. 
+# Precisamos transformá-la em tipo datetime
+notas$data_2 <- ymd_hms(notas$data)
+str(notas)
 
+# Criando o gráfico
+ggplot(notas) + geom_line(aes(x = data_2, y = Sentiment_Polarity))
+# O gráfico ficou ruim, sem interpretação
 
+# Melhorando o gráfico
+# Ficando apenas com ano e mês na coluna data_2
+notas$data_2 <- parse_date_time(format(notas$data_2, '%Y-%m'), 'ym')
+
+# Criando o mesmo gráfico para ver se melhorou um pouco
+ggplot(notas) + geom_line(aes(x = data_2, y = Sentiment_Polarity))
+# O gráfico está menos poluído, mas ainda ruim
+
+# Calculando a média de Sentiment_Polarity para cada mês-ano
+media_polaridade <- notas %>% group_by(data_2) %>% summarise(media = mean(Sentiment_Polarity))
+
+# Criando o gráfico
+polaridade_plot <- ggplot(media_polaridade) + geom_line(aes(x = data_2, y = media), color = "darkcyan") +
+  ggtitle('Média das polaridades dos sentimentos por mês-ano') +
+  xlab('Mês-Ano') +
+  ylab('Média das polaridades') +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+polaridade_plot
+
+# Fazendo um dashboard com todos os gráficos
+# Instalando e carregando a biblioteca 
+install.packages("gridExtra")
+library(gridExtra)
+
+grid.arrange(rating.Histogram, freq.Category.Plot, type.Freq.Plot,
+             size.App.Plot, RatingClass.Plot, polaridade_plot,
+             nrow = 2, ncol = 3)
 
