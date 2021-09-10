@@ -11,7 +11,7 @@ getwd()
 setwd('C:/Users/Admin/Documents/Data Visualization - Gráficos com uma variável/Parte 2')
 
 # Lendo as bases de dados
-# Bases disponibilizadas pelo curso e disponível no site do INEP
+# Bases disponibilizadas pelo curso e disponíveis no site do INEP
 enem_2010 <- fread('enem_2010.csv', encoding = 'UTF-8')
 enem_2011 <- fread('enem_2011.csv', encoding = 'UTF-8')
 enem_2012 <- fread('enem_2012.csv', encoding = 'UTF-8')
@@ -253,4 +253,189 @@ plot_scatter_ch_mat <- p
 plot_scatter_ch_mat                  
 
 
+# Gráfico de linhas das médias das notas ao longo do tempo
 
+media_anos <- enem %>% filter(!is.na(NOTA_CIENCIAS_HUMANAS) &
+                              !is.na(NOTA_CIENCIAS_NATUREZA) &
+                              !is.na(NOTA_LINGUAGENS_CODIGOS) &
+                              !is.na(NOTA_MATEMATICA) &
+                              !is.na(NOTA_REDACAO)) %>%
+                       group_by(ANO) %>%
+                       summarise(media_ch = mean(NOTA_CIENCIAS_HUMANAS),
+                                 media_cn = mean(NOTA_CIENCIAS_NATUREZA),
+                                 media_lc = mean(NOTA_LINGUAGENS_CODIGOS),
+                                 media_mt = mean(NOTA_MATEMATICA),
+                                 media_rd = mean(NOTA_REDACAO))
+View(media_anos)
+
+# Gerando o gráfico
+media_anos <- as.data.frame(media_anos)
+media_anos_2 <- melt(media_anos, id.vars = 'ANO')
+
+plot_line_notas <- ggplot(data = media_anos_2) +
+                     geom_line(aes(x = ANO, y = value, color = variable))
+
+p <- plot_line_notas +
+      ggtitle('Média das notas por Área e Ano') +
+      xlab('Ano') +
+      ylab('Média')+
+      geom_point(aes(ANO, value, color = variable), size = 3)
+
+p <- p + geom_text(aes(x = ANO, y = value, color = variable, 
+                       label = round(value, digits = 2),
+                       hjust = -0.15, vjust = 0.2))
+
+p <- p + scale_color_discrete(name = 'Áreas', labels = c('Ciências Natureza',
+                                                    'Ciências Humanas',
+                                                    'Linguagens',
+                                                    'Matemática',
+                                                    'Redação')) +
+         theme_bw()
+
+plot_line_notas <- p
+plot_line_notas
+
+
+# Fazendo uma comparação e verificando se há alguma relação entre as médias de
+# ciências humanas, matemática e redação, identificando se há alguma deficiência
+# ou sucesso nas regiões
+# Filtrando por alguns estados, por idade, não considerando NA's nas áreas que queremos
+
+enem_filtrado <- enem %>% 
+                  filter(!is.na(NOTA_CIENCIAS_HUMANAS) & 
+                         !is.na(NOTA_MATEMATICA) &
+                         !is.na(NOTA_REDACAO) &
+                         !is.na(IDADE) & IDADE > 17 &
+                         UF_PROVA %in% c('CE', 'DF', 'MG', 'RS')) %>%
+                  group_by(IDADE, UF_PROVA) %>%
+                  summarise(media_nota_matematica = mean(NOTA_MATEMATICA),
+                            media_nota_ciencias_humanas = mean(NOTA_CIENCIAS_HUMANAS),
+                            media_nota_redacao = mean(NOTA_REDACAO))
+
+View(enem_filtrado)
+
+# Gerando o gráfico
+plot_bolhas_uf_notas <- ggplot(data = enem_filtrado) + 
+                           geom_point(aes(x = media_nota_ciencias_humanas,
+                                          y = media_nota_matematica,
+                                          color = UF_PROVA,
+                                          size = media_nota_redacao),
+                                      alpha = 0.5)
+
+
+p <- plot_bolhas_uf_notas +
+      ggtitle('Médias Matemática, Ciências Humanas e Redação por estado') +
+      xlab('Média Ciências Humanas') +
+      ylab('Média Matemática')
+
+p <- p + labs(color='UF Prova', size = 'Média Redação')
+
+p <- p +
+      theme_bw() +
+      theme(legend.position = 'left')
+
+plot_bolhas_uf_notas <- p
+plot_bolhas_uf_notas
+
+
+
+# Gerando um gráfico de boxplot da nota de redação, para todos os estados
+# Filtrando a base de dados
+
+notas_redacao_uf <- enem %>% 
+                     filter(UF_PROVA != '' &
+                            !is.na(NOTA_REDACAO)) %>%
+                     select(all_of(c('UF_PROVA', 'NOTA_REDACAO')))
+
+View(notas_redacao_uf)
+
+# Gerando o gráfico
+plot_box_uf_redacao <- ggplot(data = notas_redacao_uf) +
+                        geom_boxplot(aes(x = UF_PROVA, y = NOTA_REDACAO))
+dados_boxplot <- plot_box_uf_redacao$data
+View(dados_boxplot)
+
+# Criando uma coluna que indica se aquela nota é de um dos estados que filtramos 
+# em um gráfico anterior
+dados_boxplot <- dados_boxplot %>%
+                  mutate(estado_filtro = if_else(UF_PROVA %in% c('CE', 'DF', 'MG', 'RS'), T, F))
+View(dados_boxplot)
+
+# Gerando o gráfico de tal forma que os boxplots desses estados estejam destacados
+p <- ggplot(data = dados_boxplot) +
+      geom_boxplot(aes(x = UF_PROVA, y = NOTA_REDACAO, fill = estado_filtro),
+                   outlier.colour = 'red', outlier.size = 3.5)
+p <- p +
+      xlab('UF Prova') +
+      ylab('Nota Redação') +
+      theme_bw()
+p <- p + scale_fill_manual(name = '', values = c('chocolate3', 'chartreuse3'),
+                           labels = c('Não estado filtrado', 'Estado filtrado'))
+plot_box_uf_redacao <- p
+plot_box_uf_redacao
+
+
+# Qual a relação das médias estaduais com a média nacional, para a área de redação?
+
+media_redacao <- enem %>% 
+                  filter(UF_PROVA != '' & !is.na(NOTA_REDACAO)) %>%
+                  mutate(media_nacional = mean(NOTA_REDACAO)) %>%
+                  group_by(UF_PROVA, media_nacional) %>%
+                  summarise(media_uf = mean(NOTA_REDACAO))
+
+plot_bar_error <- ggplot(data = media_redacao, aes(x = reorder(UF_PROVA, media_uf),
+                                                   y = media_uf)) +
+                  geom_errorbar(aes(ymin = 0, ymax = media_nacional), size = 1) + # representa a media nacional
+                  geom_bar(stat = 'identity') +
+                  coord_flip() 
+
+# Destacando os estados que destacamos nos gráficos anteriores
+dados_bar_error <- plot_bar_error$data
+
+dados_bar_error <- dados_bar_error %>%
+                     mutate(estado_filtro = if_else(UF_PROVA %in% c('CE', 'DF', 'MG', 'RS'), T, F))
+   
+p <- ggplot(data = dados_bar_error, aes(x = reorder(UF_PROVA, media_uf),
+                                      y = media_uf)) +
+      geom_errorbar(aes(ymin = 0, ymax = media_nacional), size = 1) + # representa a media nacional
+      geom_bar(aes(fill = estado_filtro), stat = 'identity') +
+      coord_flip() +
+      guides(fill = FALSE) +
+      ggtitle('Média nota redação por UF/Nacional') +
+      xlab('UF Prova') +
+      ylab('Média Redação') +
+      theme_bw()
+p
+# Dos estados destacados, apenas o estado de MG possui uma média de redação maior
+# que a média nacional
+plot_bar_error <- p
+plot_bar_error
+
+
+# Criando uma ou mais páginas com todos os gráficos gerados
+library(gridExtra)
+library(grid)
+
+# Como há muitos gráficos que precisam de espaço para serem bem interpretados,
+# a solução é fazer mais de uma página
+
+# Primeira página com 3 gráficos
+lay1 <- rbind(c(1,1),
+             c(2,3))
+
+grid.arrange(plot_line_notas,
+             plot_box_uf_redacao,
+             plot_bar_error, layout_matrix = lay1)
+
+# Segunda página com 3 gráficos
+lay2 <- rbind(c(1,2),
+              c(3,3))
+grid.arrange(plot_idioma_sexo,
+             plot_scatter_ch_mat,
+             plot_bolhas_uf_notas, layout_matrix = lay2)
+
+# Terceira página com 2 gráficos
+lay3 <- rbind(c(1,1),
+              c(2,2))
+grid.arrange(plot_piram_idade,
+             plot_uf_conclusao, layout_matrix = lay3)
